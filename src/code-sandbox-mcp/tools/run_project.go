@@ -101,11 +101,11 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 		case deps.Python:
 			if depFile == "requirements.txt" {
 				containerConfig.Cmd = []string{
-					fmt.Sprintf("pip install -r %s && %s", depFile, strings.Join(cmd, " ")),
+					"/bin/sh", "-c", fmt.Sprintf("uv pip install --system -r %s && %s", depFile, strings.Join(cmd, " ")),
 				}
 			} else if depFile == "pyproject.toml" || depFile == "setup.py" {
 				containerConfig.Cmd = []string{
-					fmt.Sprintf("pip install . && %s", strings.Join(cmd, " ")),
+					"/bin/sh", "-c", fmt.Sprintf("uv pip install --system . && %s", strings.Join(cmd, " ")),
 				}
 			}
 		case deps.Go:
@@ -114,6 +114,18 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 		case deps.NodeJS:
 			// Bun automatically installs dependencies when running the project, so just combine "bun" with the command after index 1
 			containerConfig.Cmd = append([]string{"bun"}, cmd[1:]...)
+		}
+	} else {
+		// Handle the case where there are no dependency files
+		switch language {
+		case deps.Python:
+			// For Python without dependencies, use shell to execute the command
+			containerConfig.Cmd = []string{
+				"/bin/sh", "-c", strings.Join(cmd, " "),
+			}
+		default:
+			// For other languages, use the command as is
+			containerConfig.Cmd = cmd
 		}
 	}
 

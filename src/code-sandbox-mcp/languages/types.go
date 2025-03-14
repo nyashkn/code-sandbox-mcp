@@ -27,10 +27,10 @@ var AllLanguages = LanguageList{Python, Go, NodeJS}
 // SupportedLanguages maps Language to their configurations
 var SupportedLanguages = map[Language]LanguageConfig{
 	Python: {
-		Image:           "ghcr.io/astral-sh/uv:debian-slim",
+		Image:           "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
 		DependencyFiles: []string{"requirements.txt", "pyproject.toml", "setup.py"},
-		InstallCommand:  []string{"pip", "install", "-r", "requirements.txt"},
-		RunCommand:      []string{"uvx", "run", "main.py"},
+		InstallCommand:  []string{"uv", "pip", "install", "--system", "-r", "requirements.txt"},
+		RunCommand:      []string{"python3", "main.py"},
 		FileExtension:   "py",
 	},
 	Go: {
