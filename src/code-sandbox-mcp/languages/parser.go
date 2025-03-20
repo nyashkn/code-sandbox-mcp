@@ -10,6 +10,8 @@ var (
 	pythonImportRe  = regexp.MustCompile(`(?m)^import\s+(\w+)`)
 	pythonFromRe    = regexp.MustCompile(`(?m)^from\s+(\w+)\s+import`)
 	pythonDynamicRe = regexp.MustCompile(`__import__\(['"](\w+)['"]\)`)
+	// Requirements comment pattern
+	pythonRequirementsRe = regexp.MustCompile(`(?m)^#\s*requirements:\s*(.+)$`)
 
 	// Node.js import patterns
 	nodeRequireRe = regexp.MustCompile(`(?m)require\(['"]([^'"]+)['"]\)`)
@@ -45,6 +47,22 @@ var (
 	}
 )
 
+// parseRequirements parses comma-separated package requirements
+func parseRequirements(requirementsStr string) []string {
+	// Split by comma and trim whitespace
+	rawReqs := strings.Split(requirementsStr, ",")
+	reqs := make([]string, 0, len(rawReqs))
+
+	for _, req := range rawReqs {
+		req = strings.TrimSpace(req)
+		if req != "" {
+			reqs = append(reqs, req)
+		}
+	}
+
+	return reqs
+}
+
 // ParsePythonImports extracts non-standard library package imports from Python code
 func ParsePythonImports(code string) []string {
 	imports := make(map[string]bool)
@@ -79,6 +97,17 @@ func ParsePythonImports(code string) []string {
 		}
 		if !pythonStdLib[pkg] {
 			imports[pkg] = true
+		}
+	}
+
+	// Find requirements comments
+	for _, match := range pythonRequirementsRe.FindAllStringSubmatch(code, -1) {
+		requirementsStr := match[1]
+		reqs := parseRequirements(requirementsStr)
+		for _, req := range reqs {
+			// For requirements we don't filter standard library
+			// This allows users to specify specific versions of standard lib packages
+			imports[req] = true
 		}
 	}
 

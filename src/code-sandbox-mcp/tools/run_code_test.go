@@ -74,7 +74,8 @@ func TestRunInDocker(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := languages.SupportedLanguages[tt.language]
-			output, err := runInDocker(ctx, config.RunCommand, config.Image, tt.code, tt.language)
+			// Pass an empty string for outputPath in tests
+			output, artifacts, err := runInDocker(ctx, config.RunCommand, config.Image, tt.code, tt.language, "")
 
 			// Check error cases
 			if (err != nil) != tt.wantErr {
@@ -91,6 +92,7 @@ func TestRunInDocker(t *testing.T) {
 				// Normalize line endings and trim spaces
 				got := strings.TrimSpace(output)
 				t.Logf("got: %q", got)
+				t.Logf("artifacts: %v", artifacts)
 				want := strings.TrimSpace(tt.wantOutput)
 				if got != want {
 					t.Errorf("runInDocker() output = %q, want %q", got, want)

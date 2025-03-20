@@ -25,6 +25,8 @@ type LanguageConfig struct {
 var AllLanguages = LanguageList{Python, Go, NodeJS}
 
 // SupportedLanguages maps Language to their configurations
+// IMPORTANT: We can only support Python, Go, and NodeJS projects.
+// The isProjectDirectory function may detect other project types, but they cannot be run.
 var SupportedLanguages = map[Language]LanguageConfig{
 	Python: {
 		Image:           "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",

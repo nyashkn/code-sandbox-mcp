@@ -60,13 +60,19 @@ func main() {
 	flag.Parse()
 	s := server.NewMCPServer("code-sandbox-mcp", "v1.0.0", server.WithLogging(), server.WithResourceCapabilities(true, true), server.WithPromptCapabilities(false))
 	s.AddNotificationHandler("notifications/error", handleNotification)
+
 	// Register a tool to run code in a docker container
 	runCodeTool := mcp.NewTool("run_code",
 		mcp.WithDescription(
 			"Run code in a sandboxed docker container with automatic dependency detection and installation. \n"+
 				"The tool will analyze your code and install required packages automatically. \n"+
+				"You can also specify dependencies using a special comment: \n"+
+				"  # requirements: package1, package2==1.0.0, package3>=2.0.0 \n"+
 				"The supported languages are: "+GenerateEnumTag()+". \n"+
-				"Returns the execution logs of the container.",
+				"Returns the execution logs of the container and any generated artifacts.\n\n"+
+				"To save output files, write them to the /artifacts directory:\n"+
+				"Example: `plt.savefig('/artifacts/plot.png')`\n\n"+
+				"You can specify an outputPath parameter to save artifacts to a specific directory.",
 		),
 		mcp.WithString("code",
 			mcp.Required(),
@@ -77,14 +83,21 @@ func main() {
 			mcp.Description("The programming language to use"),
 			mcp.Enum(deps.AllLanguages.ToArray()...),
 		),
+		mcp.WithString("outputPath",
+			mcp.Description("Optional full path to a directory where artifacts will be saved"),
+		),
 	)
 
 	runProjectTool := mcp.NewTool("run_project",
 		mcp.WithDescription(
 			"Run a project in a sandboxed docker container. \n"+
 				"The tool will install required packages automatically. \n"+
+				"For run_code, you can specify dependencies using a special comment: \n"+
+				"  # requirements: package1, package2==1.0.0, package3>=2.0.0 \n"+
 				"The supported languages are: "+GenerateEnumTag()+". \n"+
-				"Returns the resource URI of the container logs.",
+				"Returns the resource URI of the container logs and any generated artifacts.\n\n"+
+				"To save output files, write them to the /artifacts directory:\n"+
+				"Example: `plt.savefig('/artifacts/plot.png')`",
 		),
 		mcp.WithString("projectDir",
 			mcp.Required(),
@@ -112,7 +125,16 @@ func main() {
 		mcp.WithTemplateAnnotations([]mcp.Role{mcp.RoleAssistant, mcp.RoleUser}, 0.5),
 	)
 
+	// Register dynamic resource for container artifacts
+	containerArtifactsTemplate := mcp.NewResourceTemplate(
+		"artifacts://{containerid}/{filename}",
+		"Container Artifacts",
+		mcp.WithTemplateDescription("Returns file artifacts generated during code execution. Supports images, PDFs, and other file types."),
+		mcp.WithTemplateAnnotations([]mcp.Role{mcp.RoleAssistant, mcp.RoleUser}, 0.5),
+	)
+
 	s.AddResourceTemplate(containerLogsTemplate, resources.GetContainerLogs)
+	s.AddResourceTemplate(containerArtifactsTemplate, resources.GetContainerArtifact)
 	s.AddTool(runCodeTool, tools.RunCodeSandbox)
 	s.AddTool(runProjectTool, tools.RunProjectSandbox)
 
