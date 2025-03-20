@@ -67,7 +67,7 @@ func main() {
 			"Run code in a sandboxed docker container with automatic dependency detection and installation. \n"+
 				"The tool will analyze your code and install required packages automatically. \n"+
 				"You can also specify dependencies using a special comment: \n"+
-				"  # requirements: package1, package2==1.0.0, package3>=2.0.0 \n"+
+				"  # requirements: package1, package2, package3 \n"+
 				"The supported languages are: "+GenerateEnumTag()+". \n"+
 				"Returns the execution logs of the container and any generated artifacts.\n\n"+
 				"To save output files, write them to the /artifacts directory:\n"+
@@ -93,15 +93,15 @@ func main() {
 			"Run a project in a sandboxed docker container. \n"+
 				"The tool will install required packages automatically. \n"+
 				"For run_code, you can specify dependencies using a special comment: \n"+
-				"  # requirements: package1, package2==1.0.0, package3>=2.0.0 \n"+
+				"  # requirements: package1, package2, package3 \n"+
 				"The supported languages are: "+GenerateEnumTag()+". \n"+
-				"Returns the resource URI of the container logs and any generated artifacts.\n\n"+
-				"To save output files, write them to the /artifacts directory:\n"+
-				"Example: `plt.savefig('/artifacts/plot.png')`",
+				"Returns the resource URI of the container logs.\n\n"+
+				"Wait until container completes running before accessing. Check container logs to monitor status.\n\n"+
+				"Example: `plt.savefig('plot.png')`",
 		),
 		mcp.WithString("projectDir",
 			mcp.Required(),
-			mcp.Description("Location of the project to run"),
+			mcp.Description("Location of the project to run. Provide full path to project."),
 		),
 		mcp.WithString("language",
 			mcp.Required(),
