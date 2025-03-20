@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	deps "github.com/Automata-Labs-team/code-sandbox-mcp/languages"
-	resources "github.com/Automata-Labs-team/code-sandbox-mcp/resources"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -202,32 +201,11 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 		}
 	}
 
-	// Create two directories:
-	// 1. A temporary directory for internal artifact processing
-	// 2. A dedicated artifacts directory inside the project for user access
-	artifactsDir, err := os.MkdirTemp("", "project-artifacts-*")
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create temporary artifacts directory: %w", err)
-	}
-
-	// Create artifacts directory inside project directory
-	projectArtifactsDir := filepath.Join(projectDir, "artifacts")
-	if err := os.MkdirAll(projectArtifactsDir, 0755); err != nil {
-		os.RemoveAll(artifactsDir) // Clean up temp dir if we failed
-		return "", nil, fmt.Errorf("failed to create project artifacts directory: %w", err)
-	}
-
-	fmt.Printf("Created artifacts directory in project: %s\n", projectArtifactsDir)
-
 	// Create container config with working directory set to /app
 	containerConfig := &container.Config{
 		Image:      dockerImage,
 		WorkingDir: "/app",
-		// AttachStdout: true,
-		// AttachStderr: true,
-		Tty: false,
-		// Set environment variable to tell the code where the artifacts directory is
-		Env: []string{"ARTIFACTS_DIR=/artifacts"},
+		Tty:        false,
 	}
 
 	// If we have dependencies, modify the command to install them first
@@ -274,51 +252,15 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 		)
 	}
 
-	// Mount the project directory to /app and artifacts directory to /artifacts in the container
-	// Also mount the project's artifacts directory to /app/artifacts for direct access
-	binds := []string{
-		fmt.Sprintf("%s:/app", projectDir),
-		fmt.Sprintf("%s:/artifacts", artifactsDir),
-	}
-
-	fmt.Printf("Mounting binds: %v\n", binds)
-
-	// Updated approach: Use artifacts directory for both MCP resources and direct access
-	// This simplifies the approach by having a single source of truth
-	fmt.Printf("Using artifacts directory for both resource registration and direct file access\n")
-
-	// Add direct binding for user artifacts directory if specified
-	userArtifactsDir := os.Getenv("ARTIFACTS_DIR")
-	if userArtifactsDir != "" {
-		// Create user artifacts directory if it doesn't exist
-		if _, err := os.Stat(userArtifactsDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(userArtifactsDir, 0755); err != nil {
-				fmt.Printf("Warning: Failed to create user artifacts directory %s: %v\n", userArtifactsDir, err)
-			} else {
-				fmt.Printf("Created user artifacts directory: %s\n", userArtifactsDir)
-			}
-		}
-
-		// For run_project, we'll store artifacts with a project-specific subfolder
-		projectName := filepath.Base(projectDir)
-		userProjectArtifactsDir := filepath.Join(userArtifactsDir, projectName)
-		if err := os.MkdirAll(userProjectArtifactsDir, 0755); err != nil {
-			fmt.Printf("Warning: Failed to create project-specific artifacts directory %s: %v\n", userProjectArtifactsDir, err)
-		} else {
-			fmt.Printf("Created project-specific artifacts directory: %s\n", userProjectArtifactsDir)
-
-			// Instead of binding, we'll directly copy artifacts to this directory later
-			// This provides a simpler approach that doesn't rely on container environment variables
-		}
-	}
-
+	// Mount the project directory to /app
 	hostConfig := &container.HostConfig{
-		Binds: binds,
+		Binds: []string{
+			fmt.Sprintf("%s:/app", projectDir),
+		},
 	}
 
 	resp, err := cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
 	if err != nil {
-		os.RemoveAll(artifactsDir)
 		return "", nil, fmt.Errorf("failed to create container: %w", err)
 	}
 
@@ -333,7 +275,6 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 	}
 
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		os.RemoveAll(artifactsDir)
 		return "", nil, fmt.Errorf("failed to start container: %w", err)
 	}
 
@@ -347,12 +288,5 @@ func runProjectInDocker(ctx context.Context, progressToken mcp.ProgressToken, cm
 		)
 	}
 
-	// Import the actual artifacts module properly
-	// Pass the project artifacts directory so files get copied there
-	artifactURIs, err := resources.CollectArtifactsFromDir(resp.ID, artifactsDir, projectArtifactsDir)
-	if err != nil {
-		return resp.ID, nil, fmt.Errorf("failed to collect artifacts: %w", err)
-	}
-
-	return resp.ID, artifactURIs, nil
+	return resp.ID, nil, nil
 }
